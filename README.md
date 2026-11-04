@@ -1,0 +1,81 @@
+# gopro-recover
+
+Recover deleted or formatted GoPro videos from an exFAT SD card, including the case
+that defeats PhotoRec and friends: **the main 4K clip is interleaved on the card with
+its low-resolution LRV sidecar**, so a plain file carver returns MP4s with no index
+and video data that stops mid-frame.
+
+Built in one evening to find a missing reef-survey transect across four formatted
+cards. Pure Python plus ffmpeg. Read-only against the card at every step.
+
+## How it works
+
+GoPro writes each recording as two files at once, the `.MP4` and a `.LRV` preview, so
+the card ends up with the big clip's blocks interrupted every half-second or so by a
+burst of sidecar blocks. After a format the directory is gone, but the data and the
+MP4 index (`moov` atom) are still there.
+
+1. **`scan.py`** reads the whole card once and finds every `moov` index and every
+   `ftyp` file header. The index tells you the clip's duration, camera clock, resolution,
+   firmware, and the exact byte size of every video frame, audio chunk, and GPMF
+   metadata sample.
+2. **`deint.py`** walks the card block by block starting at the clip's header, checking
+   each block against what the index predicts should be there: every H.264 / H.265 frame
+   starts with a length-prefixed NAL header, every GoPro metadata sample starts with
+   `DEVC`. Blocks that match are the clip. Blocks that match the sidecar's own index,
+   or that carry an access-unit delimiter where none is expected, or that start with a
+   JPEG header, are skipped. It evicts bad tentative blocks and resyncs if it loses the
+   thread (e.g. the clip's first second was overwritten).
+3. **`preview2.py`** maps every clip over a minimum length and streams a moov-first
+   copy straight into ffmpeg to produce one thumbnail contact sheet per clip, so you can
+   identify footage by eye without extracting gigabytes.
+4. **`extract2.py`** rebuilds the chosen clip as a normal, byte-exact MP4.
+
+Verified on HERO9 (H.264), HERO10 (H.265) and HERO11 footage, 64 GB cards with 128 KB
+clusters and 32 GB cards with 32 KB clusters. A fully intact clip extracts with zero
+decode errors and the original file size to within a few hundred bytes of trailing
+padding.
+
+## Usage (macOS)
+
+```bash
+brew install ffmpeg
+# card shows up as /dev/disk4; give yourself read access to the raw device
+sudo chmod 644 /dev/rdisk4 /dev/disk4
+diskutil unmountDisk /dev/disk4
+
+export CLUSTER=131072          # exFAT cluster size in bytes; exfat.py prints it
+python3 scan.py /dev/rdisk4 card1          # ~12 min per 64 GB, writes ~/Desktop/GoPro_moov_card1/
+python3 preview2.py /dev/rdisk4 card1 45   # sheets for clips >= 45 s -> ~/Desktop/GoPro_clips_card1/
+python3 extract2.py /dev/rdisk4 card1 17 ~/Desktop/clip17.mp4
+```
+
+`ONLY=4,5 python3 preview2.py …` limits to specific clip numbers. `python3 exfat.py
+/dev/rdisk4 <partition_start_sector>` lists the directory including deleted entries,
+which is the fast path when files were deleted rather than formatted.
+
+Other helpers: `claim_heads.py` matches every index to its file header and lists
+headers nobody claims (recordings the camera never finalized); `devc_census.py` and
+`devc_locate.py` count and locate a clip's metadata markers across the card to tell
+whether its data still exists.
+
+## Identifying what you found
+
+Camera clocks on GoPros reset after a battery pull, so dates lie. Two things don't:
+
+- **File size.** A rebuilt clip's size (`mdat` end + `moov` size) matches the original
+  to within about 200 KB.
+- **Index fingerprint.** The `stsz` sample-size tables inside the `moov` are unique
+  per recording. If you still have a copy of some clips, hashing their tables against
+  the recovered indexes tells you exactly which recovered clips you already own.
+
+## Limits
+
+- Needs the `moov` index to survive. Recordings the camera never finalized have none;
+  `claim_heads.py` finds their headers but rebuilding them needs a reference index.
+- If later recordings overwrote part of a clip, the walker resyncs past the gap and
+  the extracted file plays with that stretch missing.
+- Python reads the card at 80 to 90 MB/s; expect about 25 minutes per 64 GB card for
+  scan plus previews.
+
+MIT licensed.

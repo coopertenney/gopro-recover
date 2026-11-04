@@ -1,0 +1,7 @@
+*.log
+*.out
+maps/
+__pycache__/
+*.bin
+*.jpg
+*.mp4
