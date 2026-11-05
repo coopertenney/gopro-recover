@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GoPro Recover</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#f6f5f1; --card:#fffdf9; --line:#e6e2da; --text:#2b2a27; --muted:#7a766e; --accent:#3b6ea5; --accent2:#2f5a86; --ok:#2e8b57; --warn:#c77d10; --bad:#c0392b; --soft:#efece6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  .wrap { max-width:980px; margin:0 auto; padding:28px 22px 80px; }
+  h1 { font-size:22px; font-weight:600; margin:0 0 4px; }
+  .tag { color:var(--muted); font-size:13px; margin-bottom:22px; }
+  /* stepper */
+  .steps { display:flex; align-items:center; gap:8px; margin-bottom:22px; flex-wrap:wrap; }
+  .step { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; }
+  .step .n { width:26px; height:26px; border-radius:50%; background:var(--soft); display:inline-flex; align-items:center; justify-content:center; font-size:12px; border:1px solid var(--line); }
+  .step.active { color:var(--text); font-weight:600; } .step.active .n { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .step.done .n { background:#dcebdc; color:var(--ok); border-color:#cfe3cf; }
+  .arrow { color:#c9c4ba; font-size:18px; padding:0 2px; }
+  /* cards */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px 24px; box-shadow:0 1px 2px rgba(0,0,0,.03), 0 8px 24px rgba(40,35,25,.05); }
+  .card h2 { font-size:18px; margin:0 0 6px; font-weight:600; }
+  .card p { margin:0 0 14px; color:var(--muted); }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .nav { display:flex; justify-content:space-between; align-items:center; margin-top:22px; gap:12px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:12px; padding:11px 18px; font-size:15px; cursor:pointer; transition:background .15s; }
+  button:hover { background:var(--accent2); } button:disabled { opacity:.4; cursor:default; }
+  button.ghost { background:transparent; color:var(--muted); border:1px solid var(--line); } button.ghost:hover { background:var(--soft); }
+  button.small { padding:7px 12px; font-size:13px; border-radius:10px; }
+  select, input { background:#fff; color:var(--text); border:1px solid var(--line); border-radius:10px; padding:9px 11px; font-size:14px; }
+  input[type=number] { width:86px; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
+  .progress { height:10px; background:var(--soft); border-radius:6px; overflow:hidden; flex:1; }
+  .progress > div { height:100%; background:var(--accent); width:0; transition:width .4s; }
+  .msg { color:var(--muted); font-size:13px; } .err { color:var(--bad); }
+  .hint { color:var(--muted); font-size:13px; margin-top:10px; }
+  /* results */
+  .list { display:flex; flex-direction:column; gap:10px; margin-top:6px; }
+  .item { display:grid; grid-template-columns:28px 1fr auto; gap:14px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px 14px; }
+  .item.sel { border-color:var(--accent); background:#f3f7fb; }
+  .item .title { font-weight:600; } .item .meta { color:var(--muted); font-size:13px; }
+  .item img { width:100%; border-radius:10px; margin-top:10px; cursor:zoom-in; display:block; grid-column:1 / -1; background:#000; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:var(--soft); color:var(--muted); margin-left:6px; }
+  .pill.ok { background:#e2f1e6; color:var(--ok); } .pill.warn { background:#f9ecd5; color:var(--warn); } .pill.bad { background:#f7dcd9; color:var(--bad); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; margin-top:6px; }
+  .ph { background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px; font-size:12px; color:var(--muted); }
+  .ph img { width:100%; border-radius:8px; display:block; margin-bottom:6px; background:#000; min-height:70px; cursor:zoom-in; }
+  .choice { display:flex; gap:12px; } .choice button { flex:1; padding:18px; font-size:16px; background:#fff; color:var(--text); border:1px solid var(--line); }
+  .choice button.on { border-color:var(--accent); background:#f3f7fb; color:var(--accent2); }
+  #lightbox { position:fixed; inset:0; background:rgba(20,18,14,.92); display:none; align-items:center; justify-content:center; z-index:50; cursor:zoom-out; }
+  #lightbox img { max-width:96vw; max-height:94vh; border-radius:6px; }
+  .count { color:var(--muted); font-size:13px; margin-left:auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GoPro Recover</h1>
+  <div class="tag">Gets deleted or formatted videos and photos back off a GoPro SD card. The card is only ever read.</div>
+
+  <div class="steps" id="steps"></div>
+
+  <!-- STEP 1 -->
+  <div class="card" id="s1">
+    <h2>Insert the card</h2>
+    <p>Put the SD card in a reader and plug it in. If your Mac offers to initialise it, click <b>Ignore</b>.</p>
+    <div class="row">
+      <select id="disk" style="min-width:360px"><option>Looking for cards…</option></select>
+      <button class="ghost small" onclick="loadDisks()">Refresh</button>
+    </div>
+    <div class="hint" id="diskMsg">You'll be asked for your Mac password once so the card can be read directly.</div>
+    <div class="hint err" id="ffmpegMsg" style="display:none">ffmpeg wasn't found, so previews won't work. Close this and run the launcher again, or install ffmpeg.</div>
+    <div class="nav"><span></span><button id="selectBtn" onclick="selectDisk()">Use this card →</button></div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="card" id="s2" style="display:none">
+    <h2>Scan the card</h2>
+    <p>Reads the whole card once and lists every recording it can still find. About 12 minutes for a 64 GB card.</p>
+    <div class="row">
+      <div class="progress"><div id="bar"></div></div>
+      <span class="msg" id="jobMsg"></span>
+    </div>
+    <div class="hint" id="scanInfo"></div>
+    <div class="nav">
+      <button class="ghost" onclick="go(1)">← Back</button>
+      <span>
+        <button class="ghost" id="skipScan" style="display:none" onclick="go(3)">Use last scan →</button>
+        <button id="scanBtn" onclick="startScan()">Scan now</button>
+        <button class="ghost" id="stopBtn" style="display:none" onclick="stopJob()">Stop</button>
+        <button id="nextScan" style="display:none" onclick="go(3)">Next →</button>
+      </span>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="card" id="s3" style="display:none">
+    <h2>What are you looking for?</h2>
+    <p>Narrow the list, or leave everything open to see it all.</p>
+    <div class="choice" style="margin-bottom:16px">
+      <button id="chVideo" class="on" onclick="setKind('video')">Videos</button>
+      <button id="chPhoto" onclick="setKind('photo')">Photos</button>
+    </div>
+    <div class="row" id="vidFilters">
+      <label>Shortest (seconds)<input type="number" id="fMin" value="0" min="0" placeholder="0"></label>
+      <label>Longest (seconds)<input type="number" id="fMax" placeholder="any"></label>
+      <label>Resolution <select id="fRes"><option value="">any</option></select></label>
+      <label>Camera <select id="fCam"><option value="">any</option></select></label>
+      <label>Date contains <input type="text" id="fDate" placeholder="2026-11" size="9"></label>
+    </div>
+    <div class="hint">Camera clocks on GoPros reset when the battery is pulled, so dates can be years off. Length and resolution are exact.</div>
+    <div class="nav"><button class="ghost" onclick="go(2)">← Back</button><button onclick="showResults()">Show results →</button></div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="card" id="s4" style="display:none">
+    <h2 id="resTitle">Results</h2>
+    <p id="resHelp">Click <b>Preview</b> on a clip to see a sheet of frames from start to end. Tick the ones you want, then recover them.</p>
+    <div class="row" style="margin-bottom:8px">
+      <button class="ghost small" onclick="selectAll(true)">Select all</button>
+      <button class="ghost small" onclick="selectAll(false)">Clear</button>
+      <button class="ghost small" onclick="previewAll()">Preview all shown</button>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="row" id="jobRow4" style="margin:6px 0 10px; display:none"><div class="progress"><div id="bar4"></div></div><span class="msg" id="jobMsg4"></span></div>
+    <div class="list" id="list"></div>
+    <div class="grid" id="grid" style="display:none"></div>
+    <div class="nav"><button class="ghost" onclick="go(3)">← Change filters</button><button id="recoverBtn" onclick="recoverSelected()">Recover selected →</button></div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="card" id="s5" style="display:none">
+    <h2>Recovering</h2>
+    <p id="recHelp">Rebuilding the files from the card into your chosen folder.</p>
+    <div class="row"><div class="progress"><div id="bar5"></div></div><span class="msg" id="jobMsg5"></span></div>
+    <div class="nav">
+      <button class="ghost" onclick="go(4)">← Back to results</button>
+      <span><button class="ghost" id="openBtn" style="display:none" onclick="openDest()">Open folder</button> <button class="ghost" onclick="go(1)">Start over</button></span>
+    </div>
+  </div>
+</div>
+<div id="lightbox" onclick="this.style.display='none'"><img id="lightImg"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const STEPS = ['Card','Scan','Filter','Results','Recover'];
+let cur = 1, disks = [], clipsAll = [], photosAll = [], kind = 'video', pollTimer = null, dest = null, selected = new Set(), lastDone = null;
+const fmtSize = b => b >= 1e9 ? (b/1e9).toFixed(2)+' GB' : (b/1e6).toFixed(0)+' MB';
+const fmtDur = s => { s = Math.round(s); const m = Math.floor(s/60); return m ? `${m} min ${s%60} s` : `${s} s`; };
+async function api(path, body) { const r = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)} : {}); return r.json(); }
+function renderSteps() { $('steps').innerHTML = STEPS.map((s,i) => `<div class="step ${i+1===cur?'active':i+1<cur?'done':''}"><span class="n">${i+1<cur?'✓':i+1}</span>${s}</div>${i<STEPS.length-1?'<span class="arrow">→</span>':''}`).join(''); }
+function go(n) { cur = n; for (let i=1;i<=5;i++) $('s'+i).style.display = i===n ? '' : 'none'; renderSteps(); window.scrollTo(0,0); if (n===4) renderResults(); }
+async function loadDisks() {
+  const d = await api('/api/disks'); disks = d.disks; const sel = $('disk'); sel.innerHTML = '';
+  if (!disks.length) sel.innerHTML = '<option value="">No card found. Insert it and click Refresh.</option>';
+  disks.forEach((x,i) => { const o = document.createElement('option'); o.value = i; o.textContent = `${x.name||'Card'}  ·  ${fmtSize(x.size)}  ·  ${x.device}`; sel.appendChild(o); });
+  $('ffmpegMsg').style.display = d.ffmpeg ? 'none' : 'block';
+  $('selectBtn').disabled = !disks.length;
+}
+async function selectDisk() {
+  const i = $('disk').value; if (i === '' || !disks[i]) return;
+  $('diskMsg').textContent = 'Requesting access…'; $('diskMsg').className = 'hint';
+  const r = await api('/api/select', {disk: disks[i]});
+  if (!r.ok) { $('diskMsg').textContent = r.error || 'Could not read the card.'; $('diskMsg').className = 'hint err'; return; }
+  $('diskMsg').textContent = `${r.facts.fs} card, ${(r.facts.cluster/1024)|0} KB blocks, ${fmtSize(r.facts.total)}.`;
+  const s = await api('/api/status');
+  $('skipScan').style.display = s.scanned ? '' : 'none';
+  $('scanInfo').textContent = s.scan ? `This card was scanned before (${s.scan.when}): ${s.scan.videos} video indexes, ${s.scan.photos} photos. Scan again if the card has changed.` : '';
+  if (s.scanned) { await loadClips(); await loadPhotos(); }
+  go(2);
+}
+async function startScan() { $('nextScan').style.display='none'; const r = await api('/api/scan', {}); if (!r.ok) alert('Something is already running.'); poll(); }
+async function stopJob() { await api('/api/stop', {}); }
+function setKind(k) { kind = k; $('chVideo').className = k==='video'?'on':''; $('chPhoto').className = k==='photo'?'on':''; $('vidFilters').style.display = k==='video' ? '' : 'none'; }
+async function showResults() { selected.clear(); go(4); }
+function filtered() {
+  const mn = +$('fMin').value || 0, mx = +$('fMax').value || 1e9, res = $('fRes').value, cam = $('fCam').value, date = $('fDate').value.trim();
+  return clipsAll.filter(c => c.kind==='video' && c.duration>=mn && c.duration<=mx && (!res || c.w+'x'+c.h===res) && (!cam || c.camera===cam) && (!date || (c.created||'').includes(date)));
+}
+async function loadClips() {
+  const r = await api('/api/clips'); clipsAll = r.clips;
+  const vids = clipsAll.filter(c => c.kind==='video');
+  const res = [...new Set(vids.map(c => c.w+'x'+c.h))].sort(), cams = [...new Set(vids.map(c => c.camera))].sort();
+  const fr = $('fRes'), fc = $('fCam'), vr = fr.value, vc = fc.value;
+  fr.innerHTML = '<option value="">any</option>' + res.map(x => `<option>${x}</option>`).join('');
+  fc.innerHTML = '<option value="">any</option>' + cams.map(x => `<option>${x}</option>`).join('');
+  fr.value = vr; fc.value = vc;
+}
+async function loadPhotos() { const r = await api('/api/photos'); photosAll = r.photos; }
+function renderResults() {
+  const list = $('list'), grid = $('grid');
+  if (kind === 'video') {
+    grid.style.display = 'none'; list.style.display = '';
+    const rows = filtered(); $('resTitle').textContent = 'Videos'; $('count').textContent = `${rows.length} of ${clipsAll.filter(c=>c.kind==='video').length} videos`;
+    $('resHelp').innerHTML = 'Click <b>Preview</b> on a clip to see a sheet of frames from start to end. Tick the ones you want, then recover them.';
+    list.innerHTML = rows.map(c => {
+      const intact = c.intact == null ? '' : c.intact >= 99.5 ? `<span class="pill ok">${c.intact}% intact</span>` : c.intact >= 80 ? `<span class="pill warn">${c.intact}% intact</span>` : `<span class="pill bad">${c.intact}% intact</span>`;
+      const img = c.preview ? `<img src="/preview/clip/${c.moff}?${c.moff}" onclick="event.stopPropagation(); zoom(this.src)">` : '';
+      return `<div class="item ${selected.has(c.id)?'sel':''}" onclick="toggle(${c.id})">
+        <input type="checkbox" ${selected.has(c.id)?'checked':''} onclick="event.stopPropagation(); toggle(${c.id})">
+        <div><div class="title">${fmtDur(c.duration)} · ${c.w}x${c.h} · ${c.camera}${intact}</div>
+             <div class="meta">Camera clock ${(c.created||'unknown').replace('_',' ')} · ${c.codec} · ${fmtSize(c.size)} · #${c.id}</div></div>
+        <button class="small ${c.preview?'ghost':''}" onclick="event.stopPropagation(); previewOne(${c.id})">${c.preview?'Preview again':'Preview'}</button>${img}</div>`; }).join('') || '<div class="hint">Nothing matches. Loosen the filters.</div>';
+  } else {
+    list.style.display = 'none'; grid.style.display = '';
+    $('resTitle').textContent = 'Photos'; $('count').textContent = `${photosAll.length} photos`;
+    $('resHelp').innerHTML = 'Click <b>Preview all shown</b> to see thumbnails. Photos are recovered all at once.';
+    grid.innerHTML = photosAll.map(p => `<div class="ph">${p.thumb ? `<img src="/preview/photo/${p.offset}" onclick="zoom(this.src)">` : '<div style="height:70px;background:#eee;border-radius:8px;margin-bottom:6px"></div>'}Photo ${p.id}</div>`).join('') || '<div class="hint">No photos found on this card.</div>';
+  }
+}
+function toggle(id) { selected.has(id) ? selected.delete(id) : selected.add(id); renderResults(); }
+function selectAll(v) { selected = v ? new Set(filtered().map(c => c.id)) : new Set(); renderResults(); }
+async function previewOne(id) { await api('/api/preview', {ids:[id]}); poll(); }
+async function previewAll() { if (kind==='photo') { await api('/api/photo_thumbs', {ids: photosAll.map(p=>p.id)}); } else { const ids = filtered().filter(c=>!c.preview).map(c=>c.id); if (!ids.length) return; await api('/api/preview', {ids}); } poll(); }
+async function recoverSelected() {
+  if (kind === 'photo') { const r = await api('/api/recover_photos', {ids: photosAll.map(p=>p.id)}); if (r.error) return alert(r.error); dest = r.dest; go(5); poll(); return; }
+  const ids = [...selected]; if (!ids.length) return alert('Tick at least one clip first.');
+  const r = await api('/api/recover', {ids}); if (r.error) return alert(r.error); dest = r.dest; $('recHelp').textContent = `Rebuilding ${ids.length} file(s) into ${dest}`; go(5); poll();
+}
+async function openDest() { if (dest) api('/api/open', {path: dest}); }
+function zoom(src) { $('lightImg').src = src; $('lightbox').style.display = 'flex'; }
+async function poll() {
+  clearTimeout(pollTimer);
+  const s = await api('/api/status'); const j = s.job;
+  if (!j) return;
+  const pct = (j.progress*100).toFixed(0)+'%';
+  const text = j.error ? 'Problem: '+j.error : (j.done ? 'Done.' : j.msg);
+  for (const [b,m] of [['bar','jobMsg'],['bar4','jobMsg4'],['bar5','jobMsg5']]) { $(b).style.width = pct; $(m).textContent = text; $(m).className = j.error ? 'msg err' : 'msg'; }
+  $('jobRow4').style.display = (j.kind==='preview'||j.kind==='thumbs') && (!j.done || j.error) ? '' : 'none';
+  $('stopBtn').style.display = j.kind==='scan' && !j.done ? '' : 'none'; $('scanBtn').style.display = j.kind==='scan' && !j.done ? 'none' : '';
+  if (j.done) {
+    if (lastDone !== j) { lastDone = j; await loadClips(); await loadPhotos();
+      if (j.kind==='scan' && !j.error) { $('nextScan').style.display=''; $('scanInfo').textContent = j.msg; }
+      if (j.kind==='recover' && !j.error) { $('jobMsg5').textContent = `Done. ${(j.result||[]).length} file(s) saved.`; $('openBtn').style.display=''; }
+      if (cur===4) renderResults(); }
+    return;
+  }
+  pollTimer = setTimeout(poll, 1000);
+}
+renderSteps(); loadDisks();
+(async () => { const s = await api('/api/status'); if (s.disk && s.scanned) { await loadClips(); await loadPhotos(); $('skipScan').style.display=''; $('scanInfo').textContent = `This card was scanned before (${s.scan.when}): ${s.scan.videos} video indexes, ${s.scan.photos} photos.`; $('diskMsg').textContent = 'Card already selected: '+s.disk.device; go(2); } })();
+</script>
+</body>
+</html>

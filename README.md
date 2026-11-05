@@ -1,12 +1,33 @@
 # gopro-recover
 
-Recover deleted or formatted GoPro videos from an exFAT SD card, including the case
-that defeats PhotoRec and friends: **the main 4K clip is interleaved on the card with
-its low-resolution LRV sidecar**, so a plain file carver returns MP4s with no index
-and video data that stops mid-frame.
+Get deleted or formatted videos and photos back off a GoPro SD card, including the
+case that defeats PhotoRec and friends: **the main 4K clip is interleaved on the card
+with its low-resolution LRV sidecar**, so a plain file carver returns MP4s with no
+index and video data that stops mid-frame.
 
-Built in one evening to find a missing reef-survey transect across four formatted
-cards. Pure Python plus ffmpeg. Read-only against the card at every step.
+## The app (no terminal needed)
+
+1. Click the green **Code** button on this page, then **Download ZIP**, and unzip it.
+2. Double-click **GoPro Recover.command**. The first time, macOS may say it can't be
+   opened: right-click it, choose **Open**, then **Open** again. It fetches ffmpeg once
+   (about 80 MB) and opens the app in your browser.
+3. Follow the five steps on screen: insert card, scan, filter, preview, recover.
+
+What it does, step by step:
+
+- **Card.** Pick the card from the list. You enter your Mac password once so the card
+  can be read directly; nothing is ever written to it.
+- **Scan.** One pass over the whole card, about 12 minutes per 64 GB. Finds every video
+  index and photo that survived the format.
+- **Filter.** Videos or photos; shortest and longest length; resolution; camera model;
+  date text.
+- **Results.** Each clip shows length, resolution, camera, size, and how much of it is
+  intact. **Preview** builds a sheet of frames from start to end so you can recognise
+  footage by eye. Tick what you want.
+- **Recover.** Pick a folder. Files are rebuilt as normal MP4s or JPEGs.
+
+Requirements: a Mac with Python 3 (macOS offers a one-click install if it is missing)
+and a card reader. Linux works with `python3 app.py` and ffmpeg installed.
 
 ## How it works
 
@@ -36,7 +57,7 @@ clusters and 32 GB cards with 32 KB clusters. A fully intact clip extracts with 
 decode errors and the original file size to within a few hundred bytes of trailing
 padding.
 
-## Usage (macOS)
+## Command-line use
 
 ```bash
 brew install ffmpeg
