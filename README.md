@@ -7,7 +7,8 @@ index and video data that stops mid-frame.
 
 ## The app (no terminal needed)
 
-1. Click the green **Code** button on this page, then **Download ZIP**, and unzip it.
+1. Go to **Releases** (right-hand side of this page), download **GoPro-Recover.zip**, and unzip it.
+   (Use that ZIP, not GitHub's "Download ZIP" button, which strips the launcher's permission to run.)
 2. Double-click **GoPro Recover.command**. The first time, macOS may say it can't be
    opened: right-click it, choose **Open**, then **Open** again. It fetches ffmpeg once
    (about 80 MB) and opens the app in your browser.
