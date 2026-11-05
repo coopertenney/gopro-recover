@@ -9,9 +9,14 @@ index and video data that stops mid-frame.
 
 1. Go to **Releases** (right-hand side of this page), download **GoPro-Recover.zip**, and unzip it.
    (Use that ZIP, not GitHub's "Download ZIP" button, which strips the launcher's permission to run.)
-2. Double-click **GoPro Recover.command**. The first time, macOS may say it can't be
-   opened: right-click it, choose **Open**, then **Open** again. It fetches ffmpeg once
-   (about 80 MB) and opens the app in your browser.
+2. Double-click **GoPro Recover.command**. The first time, macOS will say it can't verify
+   the developer:
+   - macOS 14 or earlier: right-click the file, choose **Open**, then **Open** again.
+   - macOS 15 or later: open **System Settings → Privacy & Security**, scroll down, click
+     **Open Anyway**, then double-click the file again.
+
+   It then checks for Python 3 (macOS offers a one-click install if it's missing), fetches
+   ffmpeg once (about 80 MB, needs internet), and opens the app in your browser.
 3. Follow the five steps on screen: insert card, scan, filter, preview, recover.
 
 What it does, step by step:
