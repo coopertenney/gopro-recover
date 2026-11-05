@@ -117,15 +117,17 @@
     <h2 id="resTitle">Results</h2>
     <p id="resHelp">Click <b>Preview</b> on a clip to see a sheet of frames from start to end. Tick the ones you want, then recover them.</p>
     <div class="row" style="margin-bottom:8px">
+      <button id="recoverBtn" onclick="recoverSelected()">Recover selected →</button>
+      <button class="ghost" onclick="recoverAll()">Recover all shown →</button>
+      <button class="small" id="previewAllBtn" onclick="previewAll()">Preview all shown</button>
       <button class="ghost small" onclick="selectAll(true)">Select all</button>
       <button class="ghost small" onclick="selectAll(false)">Clear</button>
-      <button class="ghost small" onclick="previewAll()">Preview all shown</button>
       <span class="count" id="count"></span>
     </div>
     <div class="row" id="jobRow4" style="margin:6px 0 10px; display:none"><div class="progress"><div id="bar4"></div></div><span class="msg" id="jobMsg4"></span></div>
     <div class="list" id="list"></div>
     <div class="grid" id="grid" style="display:none"></div>
-    <div class="nav"><button class="ghost" onclick="go(3)">← Change filters</button><button id="recoverBtn" onclick="recoverSelected()">Recover selected →</button></div>
+    <div class="nav"><button class="ghost" onclick="go(3)">← Change filters</button><button class="ghost" onclick="window.scrollTo(0,0)">↑ Top</button></div>
   </div>
 
   <!-- STEP 5 -->
@@ -144,7 +146,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const STEPS = ['Card','Scan','Filter','Results','Recover'];
-let cur = 1, disks = [], clipsAll = [], photosAll = [], kind = 'video', pollTimer = null, dest = null, selected = new Set(), lastDone = null;
+let cur = 1, disks = [], clipsAll = [], photosAll = [], kind = 'video', pollTimer = null, dest = null, selected = new Set(), lastDone = null, autoPreviewed = false;
 const fmtSize = b => b >= 1e9 ? (b/1e9).toFixed(2)+' GB' : (b/1e6).toFixed(0)+' MB';
 const fmtDur = s => { s = Math.round(s); const m = Math.floor(s/60); return m ? `${m} min ${s%60} s` : `${s} s`; };
 async function api(path, body) { const r = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)} : {}); return r.json(); }
@@ -172,7 +174,7 @@ async function selectDisk() {
 async function startScan() { $('nextScan').style.display='none'; const r = await api('/api/scan', {}); if (!r.ok) alert('Something is already running.'); poll(); }
 async function stopJob() { await api('/api/stop', {}); }
 function setKind(k) { kind = k; $('chVideo').className = k==='video'?'on':''; $('chPhoto').className = k==='photo'?'on':''; $('vidFilters').style.display = k==='video' ? '' : 'none'; }
-async function showResults() { selected.clear(); go(4); }
+async function showResults() { selected.clear(); autoPreviewed = false; go(4); }
 function filtered() {
   const mn = +$('fMin').value || 0, mx = +$('fMax').value || 1e9, res = $('fRes').value, cam = $('fCam').value, date = $('fDate').value.trim();
   return clipsAll.filter(c => c.kind==='video' && c.duration>=mn && c.duration<=mx && (!res || c.w+'x'+c.h===res) && (!cam || c.camera===cam) && (!date || (c.created||'').includes(date)));
@@ -192,7 +194,11 @@ function renderResults() {
   if (kind === 'video') {
     grid.style.display = 'none'; list.style.display = '';
     const rows = filtered(); $('resTitle').textContent = 'Videos'; $('count').textContent = `${rows.length} of ${clipsAll.filter(c=>c.kind==='video').length} videos`;
-    $('resHelp').innerHTML = 'Click <b>Preview</b> on a clip to see a sheet of frames from start to end. Tick the ones you want, then recover them.';
+    $('resHelp').innerHTML = 'Previews are sheets of frames from start to end. Up to 12 clips preview automatically; for more, click <b>Preview all shown</b>. Tick what you want, then recover.';
+    const missing = rows.filter(c => !c.preview);
+    $('previewAllBtn').className = missing.length ? 'small' : 'ghost small';
+    $('previewAllBtn').textContent = missing.length ? `Preview all shown (${missing.length})` : 'All previewed';
+    if (missing.length && missing.length <= 12 && !autoPreviewed) { autoPreviewed = true; api('/api/preview', {ids: missing.map(c=>c.id)}).then(poll); }
     list.innerHTML = rows.map(c => {
       const intact = c.intact == null ? '' : c.intact >= 99.5 ? `<span class="pill ok">${c.intact}% intact</span>` : c.intact >= 80 ? `<span class="pill warn">${c.intact}% intact</span>` : `<span class="pill bad">${c.intact}% intact</span>`;
       const img = c.preview ? `<img src="/preview/clip/${c.moff}?${c.moff}" onclick="event.stopPropagation(); zoom(this.src)">` : '';
@@ -212,6 +218,7 @@ function toggle(id) { selected.has(id) ? selected.delete(id) : selected.add(id);
 function selectAll(v) { selected = v ? new Set(filtered().map(c => c.id)) : new Set(); renderResults(); }
 async function previewOne(id) { await api('/api/preview', {ids:[id]}); poll(); }
 async function previewAll() { if (kind==='photo') { await api('/api/photo_thumbs', {ids: photosAll.map(p=>p.id)}); } else { const ids = filtered().filter(c=>!c.preview).map(c=>c.id); if (!ids.length) return; await api('/api/preview', {ids}); } poll(); }
+async function recoverAll() { selected = new Set(filtered().map(c => c.id)); await recoverSelected(); }
 async function recoverSelected() {
   if (kind === 'photo') { const r = await api('/api/recover_photos', {ids: photosAll.map(p=>p.id)}); if (r.error) return alert(r.error); dest = r.dest; go(5); poll(); return; }
   const ids = [...selected]; if (!ids.length) return alert('Tick at least one clip first.');

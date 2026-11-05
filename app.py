@@ -28,6 +28,10 @@ def run_job(kind, fn):
     def runner():
         try:
             job["result"] = fn(prog)
+        except FileNotFoundError:
+            job["error"] = "The card isn't connected. Reinsert it (and click Refresh on the Card step), then try again."
+        except PermissionError:
+            job["error"] = "No permission to read the card. Go back to the Card step and click 'Use this card' to grant access."
         except Exception as e:
             job["error"] = f"{e.__class__.__name__}: {e}"
             traceback.print_exc()
